@@ -1,0 +1,19 @@
+services:
+  awsy:
+    image: are-we-sdd-yet/are-we-sdd-yet
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      - rsdd
+      - sdd
+  rsdd:
+    image: are-we-sdd-yet/rsdd
+    build:
+      context: .
+      dockerfile: rsdd.Dockerfile
+  sdd:
+    image: are-we-sdd-yet/sdd
+    build:
+      context: .
+      dockerfile: sdd.Dockerfile
