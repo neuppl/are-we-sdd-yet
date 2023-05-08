@@ -1,0 +1,23 @@
+name: CI
+
+on:
+  push:
+    branches:
+    - main
+    - features/**
+    - dependabot/**
+  pull_request:
+    branches:
+    - main
+
+jobs:
+  docker-compose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Build image
+        run: docker compose build
+      - name: Run trivial benchmark
+        run: docker compose run awsy are_we_sdd_yet -f fixtures/cnf/cm152a.cnf
+      - name: Cleanup
+        run: docker compose stop
