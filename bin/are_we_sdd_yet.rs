@@ -105,10 +105,56 @@ struct BenchmarkLog {
     file: String,
     mode: CompilationMode,
     rsdd: RsddBenchmarkLog,
-    sdd: SddBenchmarkLog,
+    sdd: Option<SddBenchmarkLog>,
 }
 
-fn sdd(path_to_sdd: &str, file: &str, mode: &CompilationMode, debug: bool) -> SddBenchmarkLog {
+impl Display for BenchmarkLog {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let header = format!("Benchmark: {} (strategy: {})...", self.file, self.mode);
+
+        let rsdd_v_sdd = match (&self.rsdd, &self.sdd) {
+            (rsdd, Some(sdd)) => {
+                let speedup = format!(
+                    "{:.2}x speedup (rsdd: {:.6}s, sdd: {:.6}s)",
+                    sdd.compilation_time / rsdd.time_in_sec,
+                    rsdd.time_in_sec,
+                    sdd.compilation_time
+                );
+                let size = format!(
+                    "{:.2}x circuit size (rsdd: {}, sdd: {})",
+                    rsdd.circuit_size as f64 / sdd.sdd_size as f64,
+                    rsdd.circuit_size,
+                    sdd.sdd_size
+                );
+                let nodes = format!(
+                    "{:.2}x alloc nodes (rsdd: {}, sdd: {})",
+                    rsdd.num_nodes as f64 / sdd.sdd_count as f64,
+                    rsdd.num_nodes,
+                    sdd.sdd_count
+                );
+                format!("\n{}\n{}\n{}\n", speedup, size, nodes)
+            }
+            (rsdd, None) => {
+                format!(
+                    "no sdd run reported\n rsdd: {:.6}s, {} size, {} nodes",
+                    rsdd.time_in_sec, rsdd.circuit_size, rsdd.num_nodes
+                )
+            }
+        };
+
+        f.write_fmt(format_args!(
+            "===\n{}\n---\nrsdd v sdd{}",
+            header, rsdd_v_sdd
+        ))
+    }
+}
+
+fn sdd(
+    path_to_sdd: &str,
+    file: &str,
+    mode: &CompilationMode,
+    debug: bool,
+) -> Option<SddBenchmarkLog> {
     let mut command = Command::new(path_to_sdd);
 
     command
@@ -130,7 +176,7 @@ fn sdd(path_to_sdd: &str, file: &str, mode: &CompilationMode, debug: bool) -> Sd
 
     let stdout = command.wait_with_output().unwrap().stdout;
 
-    serde_json::from_slice::<SddBenchmarkLog>(&stdout).unwrap()
+    Some(serde_json::from_slice::<SddBenchmarkLog>(&stdout).unwrap())
 }
 
 fn rsdd(path_to_rsdd: &str, file: &str, mode: &CompilationMode, debug: bool) -> RsddBenchmarkLog {
@@ -183,25 +229,7 @@ fn main() {
     let benches = benchmark(&args, &mode);
 
     for bench in benches.iter() {
-        println!("Compiling {} with vtree strategy {}", bench.file, mode);
-        println!(
-            "{:.2}x speedup (rsdd: {:.6}s, sdd: {:.6}s)",
-            bench.sdd.compilation_time / bench.rsdd.time_in_sec,
-            bench.rsdd.time_in_sec,
-            bench.sdd.compilation_time
-        );
-        println!(
-            "{:.2}x circuit size (rsdd: {}, sdd: {})",
-            bench.rsdd.circuit_size as f64 / bench.sdd.sdd_size as f64,
-            bench.rsdd.circuit_size,
-            bench.sdd.sdd_size
-        );
-        println!(
-            "{:.2}x alloc nodes (rsdd: {}, sdd: {})",
-            bench.rsdd.num_nodes as f64 / bench.sdd.sdd_count as f64,
-            bench.rsdd.num_nodes,
-            bench.sdd.sdd_count
-        );
+        println!("{}", bench);
     }
 
     if !args.output.is_empty() {
