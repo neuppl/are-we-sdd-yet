@@ -1,0 +1,99 @@
+<!doctype html>
+<html>
+  <head>
+    <title>are we sdd yet?</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  </head>
+  <body class="p-4">
+    <h1 class="text-xl">
+      are we sdd yet?
+      (<a class="underline" href="https://github.com/neuppl/are-we-sdd-yet">code</a>)
+    </h1>
+    <div class="grid grid-cols-2">
+      <div class="relative p-2">
+        <canvas id="time"></canvas>
+      </div>
+      <div class="relative p-2">
+        <canvas id="circuit-size"></canvas>
+      </div>
+      <div class="relative p-2">
+        <canvas id="alloc-nodes"></canvas>
+      </div>
+    </div>
+    <script>
+
+      function renderComparisonChart(id, title, data) {
+        const ctx = document.getElementById(id);
+
+        new Chart(ctx, {
+          type: 'bar',
+          data,
+          options: {
+            scales: {
+              y: {
+                beginAtZero: true
+              }
+            },
+            plugins: {
+              title: {
+                display: true,
+                text: title
+              }
+            }
+          }
+        });
+      }
+
+      function sddDataset(data) {
+        return {
+          label: `sdd`,
+          backgroundColor: 'rgba(137, 196, 244, 1)',
+          data,
+        }
+      }
+
+      function rsddDataset(data) {
+        return {
+          label: `rsdd`,
+          backgroundColor: 'rgba(247, 76, 1, 0.5)',
+          data,
+        }
+      }
+
+      function renderComparisonData(data) {
+        const labels = data.map(run => run.file.replace("fixtures/cnf/", ""));
+
+        renderComparisonChart('time', 'compilation time (s)', {
+          labels,
+          datasets: [
+            rsddDataset(data.map(run => run.rsdd.time_in_sec)),
+            sddDataset(data.map(run => run.sdd.compilation_time)),
+          ]
+        })
+
+        renderComparisonChart('circuit-size', 'circuit size', {
+          labels,
+          datasets: [
+            rsddDataset(data.map(run => run.rsdd.circuit_size)),
+            sddDataset(data.map(run => run.sdd.sdd_size)),
+          ]
+        })
+
+        renderComparisonChart('alloc-nodes', '# nodes allocated', {
+          labels,
+          datasets: [
+            rsddDataset(data.map(run => run.rsdd.num_nodes)),
+            sddDataset(data.map(run => run.sdd.sdd_count)),
+          ]
+        })
+      }
+
+      fetch("output.json")
+        .then(data => data.json())
+        .then(renderComparisonData)
+    </script>
+  </body>
+</html>

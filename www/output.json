@@ -1,0 +1,104 @@
+[
+  {
+    "file": "fixtures/cnf/cht.cnf",
+    "mode": "SDDBestFit",
+    "rsdd": {
+      "circuit_size": 2938,
+      "mode": "sdd_dtree_minfill",
+      "name": "fixtures/cnf/cht.cnf",
+      "num_nodes": 12463,
+      "num_recursive": 155848,
+      "time_in_sec": 0.137216042
+    },
+    "sdd": {
+      "compilation_time": 5.48542786,
+      "sdd_count": 2253,
+      "sdd_size": 5127
+    }
+  },
+  {
+    "file": "fixtures/cnf/cm152a.cnf",
+    "mode": "SDDBestFit",
+    "rsdd": {
+      "circuit_size": 170,
+      "mode": "sdd_dtree_minfill",
+      "name": "fixtures/cnf/cm152a.cnf",
+      "num_nodes": 478,
+      "num_recursive": 1551,
+      "time_in_sec": 0.005100166
+    },
+    "sdd": {
+      "compilation_time": 0.030813,
+      "sdd_count": 62,
+      "sdd_size": 132
+    }
+  },
+  {
+    "file": "fixtures/cnf/s208.1.scan.cnf",
+    "mode": "SDDBestFit",
+    "rsdd": {
+      "circuit_size": 2262,
+      "mode": "sdd_dtree_minfill",
+      "name": "fixtures/cnf/s208.1.scan.cnf",
+      "num_nodes": 8775,
+      "num_recursive": 64105,
+      "time_in_sec": 0.017791292
+    },
+    "sdd": {
+      "compilation_time": 1.34428501,
+      "sdd_count": 1114,
+      "sdd_size": 2343
+    }
+  },
+  {
+    "file": "fixtures/cnf/tiny2.cnf",
+    "mode": "SDDBestFit",
+    "rsdd": {
+      "circuit_size": 14,
+      "mode": "sdd_dtree_minfill",
+      "name": "fixtures/cnf/tiny2.cnf",
+      "num_nodes": 21,
+      "num_recursive": 39,
+      "time_in_sec": 0.003395458
+    },
+    "sdd": {
+      "compilation_time": 0.001539,
+      "sdd_count": 9,
+      "sdd_size": 19
+    }
+  },
+  {
+    "file": "fixtures/cnf/x2.cnf",
+    "mode": "SDDBestFit",
+    "rsdd": {
+      "circuit_size": 1666,
+      "mode": "sdd_dtree_minfill",
+      "name": "fixtures/cnf/x2.cnf",
+      "num_nodes": 7235,
+      "num_recursive": 45971,
+      "time_in_sec": 0.012344167
+    },
+    "sdd": {
+      "compilation_time": 0.37278301,
+      "sdd_count": 428,
+      "sdd_size": 890
+    }
+  },
+  {
+    "file": "fixtures/cnf/c8-very-easy.cnf",
+    "mode": "SDDBestFit",
+    "rsdd": {
+      "circuit_size": 1074,
+      "mode": "sdd_dtree_minfill",
+      "name": "fixtures/cnf/c8-very-easy.cnf",
+      "num_nodes": 3284,
+      "num_recursive": 17810,
+      "time_in_sec": 0.009884584
+    },
+    "sdd": {
+      "compilation_time": 3.33227205,
+      "sdd_count": 2742,
+      "sdd_size": 7618
+    }
+  }
+]
