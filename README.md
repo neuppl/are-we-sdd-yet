@@ -44,6 +44,16 @@ Compiling fixtures/cnf/x2.cnf with vtree strategy right
 1.28x speedup (rsdd: 0.007818s, sdd: 0.010031s)
 ```
 
+Some helpful arguments:
+
+- `-o` allows you to specify an output file to dump benchmark runs to, which is great for visualization
+  - ex, in the container, run `are_we_sdd_yet -f fixtures/cnf/s208.1.scan.cnf -o output.json && cat output.json`
+- `-m` allows you to pick the compilation mode. Right now, the only reasonable options are:
+  - `-m right` (the default): right linear SDD
+  - `-m best`: the 'best' static option; this is right linear for the sdd library (seems wrong), and the DTree heuristic for rsdd
+  - `-m left`: left linear SDD. this is *extraordinarily* inefficient!
+
+
 ## Attribution and Licensing
 
 This repository is MIT licensed. It also bundles the [SDD Package](http://reasoning.cs.ucla.edu/sdd/) to properly benchmark against it; the Apache License for the project is included in the relevant directories.

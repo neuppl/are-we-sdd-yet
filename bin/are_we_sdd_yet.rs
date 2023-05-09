@@ -2,7 +2,12 @@ extern crate serde_json;
 
 use clap::Parser;
 use serde::{Deserialize, Serialize};
-use std::process::{Command, Stdio};
+use serde_json::json;
+use std::{
+    fmt::{self, Display},
+    fs,
+    process::{Command, Stdio},
+};
 
 /// Test driver for one-shot benchmark
 #[derive(Parser, Debug)]
@@ -12,19 +17,64 @@ struct Args {
     #[clap(short, long, value_parser)]
     files: Vec<String>,
 
-    // /// Mode to compile in
-    // /// Options:
-    // ///    bdd_topological
-    // ///    sdd_right_linear
-    // ///    sdd_topological_elim: compile in a topological elimination order
-    // ///    sdd_with_vtree: compile with a supplied vtree file
-    // #[clap(short, long, value_parser)]
-    // mode: String,
+    /// Mode to compile in
+    #[clap(short, long, value_parser, default_value = "right")]
+    mode: String,
+
+    /// File to output JSON to, if any
+    #[clap(short, long, value_parser, default_value = "")]
+    output: String,
+
+    /// Path to compiled sdd binary (i.e. UCLA CS ARG's sdd)
     #[clap(long, value_parser, default_value = "./sdd")]
     path_to_sdd: String,
 
+    /// Path to compiled rsdd binary
     #[clap(long, value_parser, default_value = "./rsdd")]
     path_to_rsdd: String,
+}
+
+// TODO: add BDD, etc.
+#[allow(clippy::enum_variant_names)]
+#[derive(Clone, Copy, Serialize)]
+enum CompilationMode {
+    SDDLeftLinear,
+    SDDRightLinear,
+    // SDDBalanced,
+    SDDBestFit, // EvenSplit(usize),
+                // FromDTreeLinear,
+                // FromDTreeMinFill,
+}
+
+impl CompilationMode {
+    fn as_libsdd(&self) -> &'static str {
+        match &self {
+            CompilationMode::SDDLeftLinear => "left",
+            CompilationMode::SDDRightLinear => "right",
+            // CompilationMode::SDDBalanced => "balanced",
+            CompilationMode::SDDBestFit => "right", // TODO: this seems wrong?
+        }
+    }
+
+    fn as_rsdd(&self) -> &'static str {
+        match &self {
+            CompilationMode::SDDLeftLinear => "sdd_left_linear",
+            CompilationMode::SDDRightLinear => "sdd_right_linear",
+            // CompilationMode::SDDBalanced => "linear",
+            CompilationMode::SDDBestFit => "sdd_dtree_minfill",
+        }
+    }
+}
+
+impl Display for CompilationMode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self {
+            CompilationMode::SDDLeftLinear => f.write_str("left linear"),
+            CompilationMode::SDDRightLinear => f.write_str("right linear"),
+            // CompilationMode::SDDBalanced => f.write_str("balanced"),
+            CompilationMode::SDDBestFit => f.write_str("best fit"),
+        }
+    }
 }
 
 /// copied over from rsdd.rs
@@ -32,8 +82,8 @@ struct Args {
 struct SddBenchmarkLog {
     // name: String,
     compilation_time: f64,
-    // sdd_size: usize,
-    // sdd_node_count: usize,
+    sdd_size: usize,
+    sdd_count: usize,
 }
 
 /// copied over from rsdd.rs
@@ -43,12 +93,14 @@ struct RsddBenchmarkLog {
     num_recursive: usize,
     time_in_sec: f64,
     circuit_size: usize,
+    num_nodes: usize,
     mode: String,
 }
 
+#[derive(Serialize)]
 struct BenchmarkLog {
     file: String,
-    mode: String,
+    mode: CompilationMode,
     rsdd: RsddBenchmarkLog,
     sdd: SddBenchmarkLog,
 }
@@ -87,33 +139,60 @@ fn rsdd(path_to_rsdd: &str, file: &str, mode: &str) -> RsddBenchmarkLog {
     serde_json::from_slice::<RsddBenchmarkLog>(&stdout).unwrap()
 }
 
-fn benchmark(args: Args) -> Vec<BenchmarkLog> {
+fn benchmark(args: &Args, mode: &CompilationMode) -> Vec<BenchmarkLog> {
     args.files
         .iter()
         .map(|file| BenchmarkLog {
             file: file.to_string(),
-            mode: "right".to_string(),
-            rsdd: rsdd(&args.path_to_rsdd, file, "sdd_right_linear"),
-            sdd: sdd(&args.path_to_sdd, file, "right"),
+            mode: *mode,
+            rsdd: rsdd(&args.path_to_rsdd, file, mode.as_rsdd()),
+            sdd: sdd(&args.path_to_sdd, file, mode.as_libsdd()),
         })
         .collect()
+}
+
+fn str_to_mode(str: &str) -> CompilationMode {
+    match str {
+        "left" => CompilationMode::SDDLeftLinear,
+        // "balanced" => CompilationMode::SDDBalanced,
+        "best" => CompilationMode::SDDBestFit,
+        _ => CompilationMode::SDDRightLinear,
+    }
 }
 
 fn main() {
     let args = Args::parse();
 
-    let benches = benchmark(args);
+    let mode = str_to_mode(&args.mode);
 
-    for bench in benches {
-        println!(
-            "Compiling {} with vtree strategy {}",
-            bench.file, bench.mode
-        );
+    let benches = benchmark(&args, &mode);
+
+    for bench in benches.iter() {
+        println!("Compiling {} with vtree strategy {}", bench.file, mode);
         println!(
             "{:.2}x speedup (rsdd: {:.6}s, sdd: {:.6}s)",
             bench.sdd.compilation_time / bench.rsdd.time_in_sec,
             bench.rsdd.time_in_sec,
             bench.sdd.compilation_time
         );
+        println!(
+            "{:.2}x circuit size (rsdd: {}, sdd: {})",
+            bench.rsdd.circuit_size as f64 / bench.sdd.sdd_size as f64,
+            bench.rsdd.circuit_size,
+            bench.sdd.sdd_size
+        );
+        println!(
+            "{:.2}x alloc nodes (rsdd: {}, sdd: {})",
+            bench.rsdd.num_nodes as f64 / bench.sdd.sdd_count as f64,
+            bench.rsdd.num_nodes,
+            bench.sdd.sdd_count
+        );
+    }
+
+    if !args.output.is_empty() {
+        let out = json!(benches);
+        let pretty_str = serde_json::to_string_pretty(&out).unwrap();
+        println!("Writing to {}...", &args.output);
+        fs::write(&args.output, pretty_str).expect("Error writing to file");
     }
 }

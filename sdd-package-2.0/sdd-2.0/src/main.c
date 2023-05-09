@@ -75,7 +75,7 @@ int main(int argc, char** argv) {
     c2 = clock();
     float secs = (float)(c2-c1)/CLOCKS_PER_SEC;
     fprintf(stderr,"\n\ncompilation time        : %.3f sec\n",secs);
-    fprintf(stdout, "{ \"compilation_time\": %.8f }\n", secs);
+    fprintf(stdout, "{ \"compilation_time\": %.8f, \"sdd_size\": %d, \"sdd_count\": %d }\n", secs, sdd_size(node), sdd_count(node));
   } else {
     fprintf(stderr,"\nreading sdd from file..."); fflush(stdout);
     c1 = clock();

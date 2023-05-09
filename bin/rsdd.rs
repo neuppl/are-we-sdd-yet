@@ -68,12 +68,14 @@ struct BenchmarkLog {
     num_recursive: usize,
     time_in_sec: f64,
     circuit_size: usize,
+    num_nodes: usize,
     mode: String,
 }
 
 struct BenchResult {
     num_recursive: usize,
     size: usize,
+    num_nodes: usize,
 }
 
 fn compile_topdown_nnf(str: String, _args: &Args) -> BenchResult {
@@ -85,6 +87,7 @@ fn compile_topdown_nnf(str: String, _args: &Args) -> BenchResult {
     println!("num redundant: {}", man.num_logically_redundant());
     BenchResult {
         num_recursive: 0,
+        num_nodes: 0, // TODO
         size: ddnnf.count_nodes(),
     }
 }
@@ -113,6 +116,8 @@ fn compile_sdd_dtree(str: String, _args: &Args) -> BenchResult {
 
     BenchResult {
         num_recursive: man.stats().num_rec,
+        num_nodes: man.canonicalizer().bdd_tbl().num_nodes()
+            + man.canonicalizer().sdd_tbl().num_nodes(),
         size: _sdd.count_nodes(),
     }
 }
@@ -143,6 +148,40 @@ fn compile_sdd_rightlinear(str: String, _args: &Args) -> BenchResult {
 
     BenchResult {
         num_recursive: man.stats().num_rec,
+        num_nodes: man.canonicalizer().bdd_tbl().num_nodes()
+            + man.canonicalizer().sdd_tbl().num_nodes(),
+        size: _sdd.count_nodes(),
+    }
+}
+
+fn compile_sdd_leftlinear(str: String, _args: &Args) -> BenchResult {
+    use rsdd::builder::sdd_builder::*;
+    let cnf = Cnf::from_file(str);
+    let o: Vec<VarLabel> = (0..cnf.num_vars())
+        .map(|x| VarLabel::new(x as u64))
+        .collect();
+    let vtree = VTree::left_linear(&o);
+    let mut man = SddManager::<CompressionCanonicalizer>::new(vtree.clone());
+    let _sdd = man.from_cnf(&cnf);
+
+    if let Some(path) = &_args.dump_sdd {
+        let json = ser_sdd::SDDSerializer::from_sdd(_sdd);
+        let mut file = File::create(path).unwrap();
+        let r = file.write_all(serde_json::to_string(&json).unwrap().as_bytes());
+        assert!(r.is_ok(), "Error writing file");
+    }
+
+    if let Some(path) = &_args.dump_vtree {
+        let json = ser_vtree::VTreeSerializer::from_vtree(&vtree);
+        let mut file = File::create(path).unwrap();
+        let r = file.write_all(serde_json::to_string(&json).unwrap().as_bytes());
+        assert!(r.is_ok(), "Error writing file");
+    }
+
+    BenchResult {
+        num_recursive: man.stats().num_rec,
+        num_nodes: man.canonicalizer().bdd_tbl().num_nodes()
+            + man.canonicalizer().sdd_tbl().num_nodes(),
         size: _sdd.count_nodes(),
     }
 }
@@ -162,6 +201,7 @@ fn compile_bdd(str: String, _args: &Args) -> BenchResult {
 
     BenchResult {
         num_recursive: man.num_recursive_calls(),
+        num_nodes: 0, // TODO
         size: _bdd.count_nodes(),
     }
 }
@@ -185,6 +225,7 @@ fn compile_bdd_dtree(str: String, _args: &Args) -> BenchResult {
 
     BenchResult {
         num_recursive: man.num_recursive_calls(),
+        num_nodes: 0, // TODO
         size: _bdd.count_nodes(),
     }
 }
@@ -199,6 +240,7 @@ fn main() {
         "bdd_topological" => compile_bdd(file, &args),
         "bdd_dtree_minfill" => compile_bdd_dtree(file, &args),
         "dnnf_topdown" => compile_topdown_nnf(file, &args),
+        "sdd_left_linear" => compile_sdd_leftlinear(file, &args),
         "sdd_right_linear" => compile_sdd_rightlinear(file, &args),
         "sdd_dtree_minfill" => compile_sdd_dtree(file, &args),
         x => panic!("Unknown mode option: {}", x),
@@ -211,6 +253,7 @@ fn main() {
         num_recursive: res.num_recursive,
         mode: args.mode,
         circuit_size: res.size,
+        num_nodes: res.num_nodes,
     };
 
     let obj = json!(benchmark_log);
