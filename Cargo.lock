@@ -65,6 +65,7 @@ name = "are-we-sdd-yet"
 version = "0.1.0"
 dependencies = [
  "clap 4.2.7",
+ "cudd-sys",
  "rsdd",
  "serde",
  "serde_json",
@@ -86,6 +87,15 @@ name = "autocfg"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d468802bab17cbc0cc575e9b053f41e72aa36bfa6b7f55e3529ffa43161b97fa"
+
+[[package]]
+name = "autotools"
+version = "0.2.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aef8da1805e028a172334c3b680f93e71126f2327622faef2ec3d893c0a4ad77"
+dependencies = [
+ "cc",
+]
 
 [[package]]
 name = "bit-set"
@@ -334,6 +344,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2b2466559f260f48ad25fe6317b3c8dac77b5bdb5763ac7d9d6103530663bc90"
 dependencies = [
  "memchr",
+]
+
+[[package]]
+name = "cudd-sys"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "da04b991245abeb377212488dd81428ec1f8e99522c16e859ff42b2999f209ea"
+dependencies = [
+ "autotools",
+ "libc",
 ]
 
 [[package]]

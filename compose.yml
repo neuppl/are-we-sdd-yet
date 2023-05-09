@@ -12,6 +12,11 @@ services:
     build:
       context: .
       dockerfile: rsdd.Dockerfile
+  cudd:
+    image: are-we-sdd-yet/cudd
+    build:
+      context: .
+      dockerfile: cudd.Dockerfile
   sdd:
     image: are-we-sdd-yet/sdd
     build:
