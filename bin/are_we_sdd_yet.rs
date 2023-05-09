@@ -13,6 +13,9 @@ use std::{
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
 struct Args {
+    #[clap(short, long, default_value_t = false)]
+    debug: bool,
+
     /// CNF files to benchmark
     #[clap(short, long, value_parser)]
     files: Vec<String>,
@@ -36,7 +39,7 @@ struct Args {
 
 // TODO: add BDD, etc.
 #[allow(clippy::enum_variant_names)]
-#[derive(Clone, Copy, Serialize)]
+#[derive(Clone, Copy, PartialEq, Serialize)]
 enum CompilationMode {
     SDDLeftLinear,
     SDDRightLinear,
@@ -105,34 +108,46 @@ struct BenchmarkLog {
     sdd: SddBenchmarkLog,
 }
 
-fn sdd(path_to_sdd: &str, file: &str, mode: &str) -> SddBenchmarkLog {
-    let command = Command::new(path_to_sdd)
+fn sdd(path_to_sdd: &str, file: &str, mode: &CompilationMode, debug: bool) -> SddBenchmarkLog {
+    let mut command = Command::new(path_to_sdd);
+
+    command
         .arg("-c")
         .arg(file)
         .arg("-t")
-        .arg(mode)
-        .arg("-r")
-        .arg("0")
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .spawn()
-        .expect("rsdd failure");
+        .arg(mode.as_libsdd())
+        .stdout(Stdio::piped());
+
+    if (*mode) != CompilationMode::SDDBestFit {
+        command.arg("-r").arg("0");
+    }
+
+    if !debug {
+        command.stderr(Stdio::null());
+    }
+
+    let command = command.spawn().expect("libsdd failure");
 
     let stdout = command.wait_with_output().unwrap().stdout;
 
     serde_json::from_slice::<SddBenchmarkLog>(&stdout).unwrap()
 }
 
-fn rsdd(path_to_rsdd: &str, file: &str, mode: &str) -> RsddBenchmarkLog {
-    let command = Command::new(path_to_rsdd)
+fn rsdd(path_to_rsdd: &str, file: &str, mode: &CompilationMode, debug: bool) -> RsddBenchmarkLog {
+    let mut command = Command::new(path_to_rsdd);
+
+    command
         .arg("-f")
         .arg(file)
         .arg("-m")
-        .arg(mode)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .spawn()
-        .expect("rsdd failure");
+        .arg(mode.as_rsdd())
+        .stdout(Stdio::piped());
+
+    if !debug {
+        command.stderr(Stdio::null());
+    }
+
+    let command = command.spawn().expect("rsdd failure");
 
     let stdout = command.wait_with_output().unwrap().stdout;
 
@@ -145,8 +160,8 @@ fn benchmark(args: &Args, mode: &CompilationMode) -> Vec<BenchmarkLog> {
         .map(|file| BenchmarkLog {
             file: file.to_string(),
             mode: *mode,
-            rsdd: rsdd(&args.path_to_rsdd, file, mode.as_rsdd()),
-            sdd: sdd(&args.path_to_sdd, file, mode.as_libsdd()),
+            rsdd: rsdd(&args.path_to_rsdd, file, mode, args.debug),
+            sdd: sdd(&args.path_to_sdd, file, mode, args.debug),
         })
         .collect()
 }
