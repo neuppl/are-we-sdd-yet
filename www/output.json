@@ -100,5 +100,22 @@
       "sdd_count": 2742,
       "sdd_size": 7618
     }
+  },
+  {
+    "file": "fixtures/cnf/c8.cnf",
+    "mode": "SDDBestFit",
+    "rsdd": {
+      "circuit_size": 37390,
+      "mode": "sdd_dtree_minfill",
+      "name": "fixtures/cnf/c8.cnf",
+      "num_nodes": 113807,
+      "num_recursive": 644500,
+      "time_in_sec": 0.260568792
+    },
+    "sdd": {
+      "compilation_time": 44.21352386,
+      "sdd_count": 14305,
+      "sdd_size": 43139
+    }
   }
 ]
