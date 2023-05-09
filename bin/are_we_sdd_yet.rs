@@ -8,9 +8,9 @@ use std::process::{Command, Stdio};
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
 struct Args {
-    /// File to benchmark
+    /// CNF files to benchmark
     #[clap(short, long, value_parser)]
-    file: String,
+    files: Vec<String>,
 
     // /// Mode to compile in
     // /// Options:
@@ -46,6 +46,13 @@ struct RsddBenchmarkLog {
     mode: String,
 }
 
+struct BenchmarkLog {
+    file: String,
+    mode: String,
+    rsdd: RsddBenchmarkLog,
+    sdd: SddBenchmarkLog,
+}
+
 fn sdd(path_to_sdd: &str, file: &str, mode: &str) -> SddBenchmarkLog {
     let command = Command::new(path_to_sdd)
         .arg("-c")
@@ -55,6 +62,7 @@ fn sdd(path_to_sdd: &str, file: &str, mode: &str) -> SddBenchmarkLog {
         .arg("-r")
         .arg("0")
         .stdout(Stdio::piped())
+        .stderr(Stdio::null())
         .spawn()
         .expect("rsdd failure");
 
@@ -70,6 +78,7 @@ fn rsdd(path_to_rsdd: &str, file: &str, mode: &str) -> RsddBenchmarkLog {
         .arg("-m")
         .arg(mode)
         .stdout(Stdio::piped())
+        .stderr(Stdio::null())
         .spawn()
         .expect("rsdd failure");
 
@@ -78,12 +87,33 @@ fn rsdd(path_to_rsdd: &str, file: &str, mode: &str) -> RsddBenchmarkLog {
     serde_json::from_slice::<RsddBenchmarkLog>(&stdout).unwrap()
 }
 
+fn benchmark(args: Args) -> Vec<BenchmarkLog> {
+    args.files
+        .iter()
+        .map(|file| BenchmarkLog {
+            file: file.to_string(),
+            mode: "right".to_string(),
+            rsdd: rsdd(&args.path_to_rsdd, file, "sdd_right_linear"),
+            sdd: sdd(&args.path_to_sdd, file, "right"),
+        })
+        .collect()
+}
+
 fn main() {
     let args = Args::parse();
 
-    let sdd_out = sdd(&args.path_to_sdd, &args.file, "right");
-    let rsdd_out = rsdd(&args.path_to_rsdd, &args.file, "sdd_right_linear");
+    let benches = benchmark(args);
 
-    println!("SDD time: {}", sdd_out.compilation_time);
-    println!("RSDD time: {}", rsdd_out.time_in_sec);
+    for bench in benches {
+        println!(
+            "Compiling {} with vtree strategy {}",
+            bench.file, bench.mode
+        );
+        println!(
+            "{:.2}x speedup (rsdd: {:.6}s, sdd: {:.6}s)",
+            bench.sdd.compilation_time / bench.rsdd.time_in_sec,
+            bench.rsdd.time_in_sec,
+            bench.sdd.compilation_time
+        );
+    }
 }
