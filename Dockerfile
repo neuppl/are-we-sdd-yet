@@ -2,6 +2,8 @@ FROM are-we-sdd-yet/sdd as sddbuilder
 
 FROM are-we-sdd-yet/rsdd as rsddbuilder
 
+FROM are-we-sdd-yet/cnf2obdd as cnf2obddbuilder
+
 # for more on cargo chef, see:
 # https://github.com/LukeMathWalker/cargo-chef
 
@@ -26,6 +28,7 @@ WORKDIR /usr/src
 
 COPY --from=sddbuilder /usr/src/sdd /usr/src/sdd
 COPY --from=rsddbuilder /usr/src/rsdd /usr/src/rsdd
+COPY --from=cnf2obddbuilder /usr/src/bdd_minisat_all_static /usr/src/cnf2obdd
 
 COPY --from=builder /usr/local/cargo/bin/are_we_sdd_yet /usr/local/bin/are_we_sdd_yet
 

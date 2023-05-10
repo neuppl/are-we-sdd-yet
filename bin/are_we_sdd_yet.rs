@@ -35,18 +35,19 @@ struct Args {
     /// Path to compiled rsdd binary
     #[clap(long, value_parser, default_value = "./rsdd")]
     path_to_rsdd: String,
+
+    /// Path to compiled cnf2obdd binary
+    #[clap(long, value_parser, default_value = "./cnf2obdd")]
+    path_to_cnf2obdd: String,
 }
 
-// TODO: add BDD, etc.
-#[allow(clippy::enum_variant_names)]
 #[derive(Clone, Copy, PartialEq, Serialize)]
 enum CompilationMode {
     SDDLeftLinear,
     SDDRightLinear,
     // SDDBalanced,
-    SDDBestFit, // EvenSplit(usize),
-                // FromDTreeLinear,
-                // FromDTreeMinFill,
+    BestFit,
+    BDDBestFit,
 }
 
 impl CompilationMode {
@@ -55,7 +56,8 @@ impl CompilationMode {
             CompilationMode::SDDLeftLinear => "left",
             CompilationMode::SDDRightLinear => "right",
             // CompilationMode::SDDBalanced => "balanced",
-            CompilationMode::SDDBestFit => "right", // TODO: this seems wrong?
+            CompilationMode::BestFit => "right", // TODO: this seems wrong?
+            _ => panic!("invalid compilation mode for libsdd"),
         }
     }
 
@@ -64,7 +66,8 @@ impl CompilationMode {
             CompilationMode::SDDLeftLinear => "sdd_left_linear",
             CompilationMode::SDDRightLinear => "sdd_right_linear",
             // CompilationMode::SDDBalanced => "linear",
-            CompilationMode::SDDBestFit => "sdd_dtree_minfill",
+            CompilationMode::BestFit => "sdd_dtree_minfill",
+            CompilationMode::BDDBestFit => "bdd_dtree_minfill",
         }
     }
 }
@@ -75,7 +78,8 @@ impl Display for CompilationMode {
             CompilationMode::SDDLeftLinear => f.write_str("left linear"),
             CompilationMode::SDDRightLinear => f.write_str("right linear"),
             // CompilationMode::SDDBalanced => f.write_str("balanced"),
-            CompilationMode::SDDBestFit => f.write_str("best fit"),
+            CompilationMode::BestFit => f.write_str("best fit"),
+            CompilationMode::BDDBestFit => f.write_str("best fit (bdd)"),
         }
     }
 }
@@ -100,11 +104,17 @@ struct RsddBenchmarkLog {
     mode: String,
 }
 
+#[derive(Serialize, Deserialize)]
+struct Cnf2ObddBenchmarkLog {
+    time: f64,
+}
+
 #[derive(Serialize)]
 struct BenchmarkLog {
     file: String,
     mode: CompilationMode,
     rsdd: RsddBenchmarkLog,
+    cnf2obdd: Option<Cnf2ObddBenchmarkLog>,
     sdd: Option<SddBenchmarkLog>,
 }
 
@@ -132,19 +142,38 @@ impl Display for BenchmarkLog {
                     rsdd.num_nodes,
                     sdd.sdd_count
                 );
-                format!("\n{}\n{}\n{}\n", speedup, size, nodes)
+                format!("{}\n{}\n{}\n", speedup, size, nodes)
             }
             (rsdd, None) => {
                 format!(
-                    "no sdd run reported\n rsdd: {:.6}s, {} size, {} nodes",
+                    "no sdd run reported\nrsdd: {:.6}s, {} size, {} nodes",
+                    rsdd.time_in_sec, rsdd.circuit_size, rsdd.num_nodes
+                )
+            }
+        };
+
+        let rsdd_v_cnf2obdd = match (&self.rsdd, &self.cnf2obdd) {
+            (rsdd, Some(cnf2obdd)) => {
+                let speedup = format!(
+                    "{:.2}x speedup (rsdd: {:.6}s, cnf2obdd: {:.6}s)",
+                    cnf2obdd.time / rsdd.time_in_sec,
+                    rsdd.time_in_sec,
+                    cnf2obdd.time
+                );
+                // format!("{}", speedup)
+                speedup
+            }
+            (rsdd, None) => {
+                format!(
+                    "no cnf2obdd run reported\nrsdd: {:.6}s, {} size, {} nodes",
                     rsdd.time_in_sec, rsdd.circuit_size, rsdd.num_nodes
                 )
             }
         };
 
         f.write_fmt(format_args!(
-            "===\n{}\n---\nrsdd v sdd{}",
-            header, rsdd_v_sdd
+            "===\n{}\n---\nrsdd v sdd\n{}\n---\nrsdd v cnf2obdd\n{}",
+            header, rsdd_v_sdd, rsdd_v_cnf2obdd
         ))
     }
 }
@@ -155,6 +184,13 @@ fn sdd(
     mode: &CompilationMode,
     debug: bool,
 ) -> Option<SddBenchmarkLog> {
+    if !matches!(
+        mode,
+        CompilationMode::SDDLeftLinear | CompilationMode::SDDRightLinear | CompilationMode::BestFit
+    ) {
+        return None;
+    }
+
     let mut command = Command::new(path_to_sdd);
 
     command
@@ -164,7 +200,7 @@ fn sdd(
         .arg(mode.as_libsdd())
         .stdout(Stdio::piped());
 
-    if (*mode) != CompilationMode::SDDBestFit {
+    if !matches!(mode, CompilationMode::BestFit) {
         command.arg("-r").arg("0");
     }
 
@@ -200,6 +236,47 @@ fn rsdd(path_to_rsdd: &str, file: &str, mode: &CompilationMode, debug: bool) -> 
     serde_json::from_slice::<RsddBenchmarkLog>(&stdout).unwrap()
 }
 
+fn cnf2obdd(
+    path_to_cnf2obdd: &str,
+    file: &str,
+    mode: &CompilationMode,
+    debug: bool,
+) -> Option<Cnf2ObddBenchmarkLog> {
+    if !matches!(mode, CompilationMode::BestFit | CompilationMode::BDDBestFit) {
+        return None;
+    }
+
+    let mut command = Command::new(path_to_cnf2obdd);
+
+    command.arg(file).stdout(Stdio::piped());
+
+    if !debug {
+        command.stderr(Stdio::null());
+    }
+
+    let command = command.spawn().expect("cnf2obdd failure");
+
+    let output = command.wait_with_output();
+
+    match output {
+        Ok(output) => match serde_json::from_slice::<Cnf2ObddBenchmarkLog>(&output.stdout) {
+            Ok(s) => Some(s),
+            Err(e) => {
+                if debug {
+                    eprintln!("{}", e)
+                };
+                None
+            }
+        },
+        Err(e) => {
+            if debug {
+                eprintln!("{}", e)
+            };
+            None
+        }
+    }
+}
+
 fn benchmark(args: &Args, mode: &CompilationMode) -> Vec<BenchmarkLog> {
     args.files
         .iter()
@@ -207,6 +284,7 @@ fn benchmark(args: &Args, mode: &CompilationMode) -> Vec<BenchmarkLog> {
             file: file.to_string(),
             mode: *mode,
             rsdd: rsdd(&args.path_to_rsdd, file, mode, args.debug),
+            cnf2obdd: cnf2obdd(&args.path_to_cnf2obdd, file, mode, args.debug),
             sdd: sdd(&args.path_to_sdd, file, mode, args.debug),
         })
         .collect()
@@ -216,7 +294,8 @@ fn str_to_mode(str: &str) -> CompilationMode {
     match str {
         "left" => CompilationMode::SDDLeftLinear,
         // "balanced" => CompilationMode::SDDBalanced,
-        "best" => CompilationMode::SDDBestFit,
+        "best" => CompilationMode::BestFit,
+        "best-bdd" | "bdd-best" => CompilationMode::BDDBestFit,
         _ => CompilationMode::SDDRightLinear,
     }
 }

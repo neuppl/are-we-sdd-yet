@@ -2,12 +2,13 @@
 
 This repo is a work-in-progress benchmarking suite comparing [rsdd](https://github.com/neuppl/rsdd) to other decision diagram libraries. The goal is to provide a simple, consistent, and **reproducible** set of tools to produce results about the tool.
 
-Currently, this tool only supports head-to-head benchmarks against `sdd`.
+Currently, this tool only supports head-to-head benchmarks against the [`sdd` package](http://reasoning.cs.ucla.edu/sdd/) and the [`cnf2obdd` tool](http://www.sd.is.uec.ac.jp/toda/code/cnf2obdd.html).
 
 Some future plans:
 
 - autogenerate a website to view statistics
 - integrate CUDD (major blockers: lack of out-of-the-box CLI, BLIF format)
+- integrate Sylvan
 - benchmark other tasks:
   - marginal map
   - reachability
@@ -51,9 +52,14 @@ Some helpful arguments:
 - `-m` allows you to pick the compilation mode. Right now, the only reasonable options are:
   - `-m right` (the default): right linear SDD
   - `-m best`: the 'best' static option; this is right linear for the sdd library (seems wrong), and the DTree heuristic for rsdd
+  - `-m best-bdd`/`-m bdd-best`: the 'best' static option, limited to BDDs only; this is a more fair comparison for cnf2obdd
   - `-m left`: left linear SDD. this is *extraordinarily* inefficient!
 
 
 ## Attribution and Licensing
 
-This repository is MIT licensed. It also bundles the [SDD Package](http://reasoning.cs.ucla.edu/sdd/) to properly benchmark against it; the Apache License for the project is included in the relevant directories.
+This repository is MIT licensed.
+
+It bundles the [SDD Package](http://reasoning.cs.ucla.edu/sdd/) to properly benchmark against it; the Apache License for the project is included in the relevant directories.
+
+It bundles the [CNF2OBDD tool](http://www.sd.is.uec.ac.jp/toda/code/cnf2obdd.html) to properly benchmark against it; the (inherited) MIT License for the project is included in the relevant directories.

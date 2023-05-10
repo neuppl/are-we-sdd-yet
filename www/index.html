@@ -47,6 +47,14 @@
         });
       }
 
+      function cnf2obddDataset(data) {
+        return {
+          label: `cnf2obdd`,
+          backgroundColor: 'rgba(255, 0, 255, 1)',
+          data,
+        }
+      }
+
       function sddDataset(data) {
         return {
           label: `sdd`,
@@ -71,6 +79,7 @@
           datasets: [
             rsddDataset(data.map(run => run.rsdd.time_in_sec)),
             sddDataset(data.map(run => run.sdd.compilation_time)),
+            cnf2obddDataset(data.map(run => run.cnf2obdd?.time)),
           ]
         })
 

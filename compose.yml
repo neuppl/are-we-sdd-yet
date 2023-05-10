@@ -6,12 +6,18 @@ services:
       dockerfile: Dockerfile
     depends_on:
       - rsdd
+      - cnf2obdd
       - sdd
   rsdd:
     image: are-we-sdd-yet/rsdd
     build:
       context: .
       dockerfile: rsdd.Dockerfile
+  cnf2obdd:
+    image: are-we-sdd-yet/cnf2obdd
+    build:
+      context: .
+      dockerfile: cnf2obdd.Dockerfile
   sdd:
     image: are-we-sdd-yet/sdd
     build:
