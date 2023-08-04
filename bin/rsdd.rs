@@ -2,18 +2,19 @@ extern crate rsdd;
 extern crate serde_json;
 
 use clap::Parser;
-use rsdd::builder::bdd::{BddBuilder, RobddBuilder};
-use rsdd::builder::cache::lru_app::BddApplyTable;
+use rsdd::builder::bdd::RobddBuilder;
+use rsdd::builder::cache::AllIteTable;
 use rsdd::builder::decision_nnf::{DecisionNNFBuilder, StandardDecisionNNFBuilder};
 use rsdd::builder::sdd::{CompressionSddBuilder, SddBuilder};
-use rsdd::plan::bdd_plan::BddPlan;
-use rsdd::repr::bdd::BddPtr;
-use rsdd::repr::cnf::Cnf;
-use rsdd::repr::ddnnf::DDNNFPtr;
-use rsdd::repr::dtree::DTree;
-use rsdd::repr::var_label::VarLabel;
-use rsdd::repr::var_order::VarOrder;
-use rsdd::repr::vtree::VTree;
+use rsdd::builder::BottomUpBuilder;
+use rsdd::plan::BottomUpPlan;
+use rsdd::repr::BddPtr;
+use rsdd::repr::Cnf;
+use rsdd::repr::DDNNFPtr;
+use rsdd::repr::DTree;
+use rsdd::repr::VTree;
+use rsdd::repr::VarLabel;
+use rsdd::repr::VarOrder;
 use rsdd::serialize::{BDDSerializer, SDDSerializer, VTreeSerializer};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -71,18 +72,16 @@ struct BenchmarkLog {
     num_recursive: usize,
     time_in_sec: f64,
     circuit_size: usize,
-    num_nodes: usize,
     mode: String,
 }
 
 struct BenchResult {
     num_recursive: usize,
     size: usize,
-    num_nodes: usize,
 }
 
 fn compile_topdown_nnf(str: String, _args: &Args) -> BenchResult {
-    let cnf = Cnf::from_file(str);
+    let cnf = Cnf::from_dimacs(&str);
     let order = VarOrder::linear_order(cnf.num_vars());
     let builder = StandardDecisionNNFBuilder::new(order);
     // let order = cnf.force_order();
@@ -90,13 +89,12 @@ fn compile_topdown_nnf(str: String, _args: &Args) -> BenchResult {
     println!("num redundant: {}", builder.num_logically_redundant());
     BenchResult {
         num_recursive: 0,
-        num_nodes: 0, // TODO
         size: ddnnf.count_nodes(),
     }
 }
 
 fn compile_sdd_dtree(str: String, _args: &Args) -> BenchResult {
-    let cnf = Cnf::from_file(str);
+    let cnf = Cnf::from_dimacs(&str);
     let dtree = DTree::from_cnf(&cnf, &cnf.min_fill_order());
     let vtree = VTree::from_dtree(&dtree).unwrap();
     let builder = CompressionSddBuilder::new(vtree.clone());
@@ -118,13 +116,12 @@ fn compile_sdd_dtree(str: String, _args: &Args) -> BenchResult {
 
     BenchResult {
         num_recursive: builder.stats().num_recursive_calls,
-        num_nodes: sdd.num_child_nodes(),
         size: sdd.count_nodes(),
     }
 }
 
 fn compile_sdd_rightlinear(str: String, _args: &Args) -> BenchResult {
-    let cnf = Cnf::from_file(str);
+    let cnf = Cnf::from_dimacs(&str);
     let o: Vec<VarLabel> = (0..cnf.num_vars())
         .map(|x| VarLabel::new(x as u64))
         .collect();
@@ -148,13 +145,12 @@ fn compile_sdd_rightlinear(str: String, _args: &Args) -> BenchResult {
 
     BenchResult {
         num_recursive: builder.stats().num_recursive_calls,
-        num_nodes: sdd.num_child_nodes(),
         size: sdd.count_nodes(),
     }
 }
 
 fn compile_sdd_leftlinear(str: String, _args: &Args) -> BenchResult {
-    let cnf = Cnf::from_file(str);
+    let cnf = Cnf::from_dimacs(&str);
     let o: Vec<VarLabel> = (0..cnf.num_vars())
         .map(|x| VarLabel::new(x as u64))
         .collect();
@@ -178,14 +174,13 @@ fn compile_sdd_leftlinear(str: String, _args: &Args) -> BenchResult {
 
     BenchResult {
         num_recursive: builder.stats().num_recursive_calls,
-        num_nodes: sdd.num_child_nodes(),
         size: sdd.count_nodes(),
     }
 }
 
 fn compile_bdd(str: String, _args: &Args) -> BenchResult {
-    let cnf = Cnf::from_file(str);
-    let builder = RobddBuilder::<BddApplyTable<BddPtr>>::new_default_order_lru(cnf.num_vars());
+    let cnf = Cnf::from_dimacs(&str);
+    let builder = RobddBuilder::<AllIteTable<BddPtr>>::new_with_linear_order(cnf.num_vars());
     let bdd = builder.compile_cnf(&cnf);
 
     if let Some(path) = &_args.dump_bdd {
@@ -197,18 +192,16 @@ fn compile_bdd(str: String, _args: &Args) -> BenchResult {
 
     BenchResult {
         num_recursive: builder.num_recursive_calls(),
-        num_nodes: 0, // TODO
         size: bdd.count_nodes(),
     }
 }
 
 fn compile_bdd_dtree(str: String, _args: &Args) -> BenchResult {
-    let cnf = Cnf::from_file(str);
+    let cnf = Cnf::from_dimacs(&str);
     let order = cnf.min_fill_order();
     let dtree = DTree::from_cnf(&cnf, &order);
-    let builder =
-        RobddBuilder::<BddApplyTable<BddPtr>>::new(order, BddApplyTable::new(cnf.num_vars()));
-    let plan = BddPlan::from_dtree(&dtree);
+    let builder = RobddBuilder::<AllIteTable<BddPtr>>::new(order);
+    let plan = BottomUpPlan::from_dtree(&dtree);
     let bdd = builder.compile_plan(&plan);
 
     if let Some(path) = &_args.dump_bdd {
@@ -220,7 +213,6 @@ fn compile_bdd_dtree(str: String, _args: &Args) -> BenchResult {
 
     BenchResult {
         num_recursive: builder.num_recursive_calls(),
-        num_nodes: 0, // TODO
         size: bdd.count_nodes(),
     }
 }
@@ -248,7 +240,6 @@ fn main() {
         num_recursive: res.num_recursive,
         mode: args.mode,
         circuit_size: res.size,
-        num_nodes: res.num_nodes,
     };
 
     let obj = json!(benchmark_log);
