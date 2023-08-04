@@ -87,7 +87,6 @@ impl Display for CompilationMode {
 /// copied over from rsdd.rs
 #[derive(Serialize, Deserialize)]
 struct SddBenchmarkLog {
-    // name: String,
     compilation_time: f64,
     sdd_size: usize,
     sdd_count: usize,
@@ -100,7 +99,6 @@ struct RsddBenchmarkLog {
     num_recursive: usize,
     time_in_sec: f64,
     circuit_size: usize,
-    num_nodes: usize,
     mode: String,
 }
 
@@ -136,18 +134,12 @@ impl Display for BenchmarkLog {
                     rsdd.circuit_size,
                     sdd.sdd_size
                 );
-                let nodes = format!(
-                    "{:.2}x alloc nodes (rsdd: {}, sdd: {})",
-                    rsdd.num_nodes as f64 / sdd.sdd_count as f64,
-                    rsdd.num_nodes,
-                    sdd.sdd_count
-                );
-                format!("{}\n{}\n{}\n", speedup, size, nodes)
+                format!("{}\n{}\n", speedup, size)
             }
             (rsdd, None) => {
                 format!(
-                    "no sdd run reported\nrsdd: {:.6}s, {} size, {} nodes",
-                    rsdd.time_in_sec, rsdd.circuit_size, rsdd.num_nodes
+                    "no sdd run reported\nrsdd: {:.6}s, {} size",
+                    rsdd.time_in_sec, rsdd.circuit_size
                 )
             }
         };
@@ -160,13 +152,12 @@ impl Display for BenchmarkLog {
                     rsdd.time_in_sec,
                     cnf2obdd.time
                 );
-                // format!("{}", speedup)
                 speedup
             }
             (rsdd, None) => {
                 format!(
-                    "no cnf2obdd run reported\nrsdd: {:.6}s, {} size, {} nodes",
-                    rsdd.time_in_sec, rsdd.circuit_size, rsdd.num_nodes
+                    "no cnf2obdd run reported\nrsdd: {:.6}s, {} size",
+                    rsdd.time_in_sec, rsdd.circuit_size
                 )
             }
         };
